@@ -1,0 +1,158 @@
+/*-------------------------------------------------------------------*/
+/* RTVDDSSRCC - Retrieve DDS Source                                  */
+/*                                                                   */
+/* Michael Sansoterra, 01/20/03                                      */
+/*                                                                   */
+/* Compile Instructions:                                             */
+/* CRTCLPGM PGM(XXX/RTVDDSSRCC) SRCFILE(XXX/QCLSRC)                  */
+/*                                                                   */
+/*-------------------------------------------------------------------*/
+             PGM        PARM(&QONAME &QSNAME &MBRNAM &REPLACE)
+
+             DCL        &QONAME  *CHAR 20 /* Qualified Object (file) +
+                          name    */
+             DCL        &QSNAME  *CHAR 20 /* Qualified Source File +
+                          name      */
+             DCL        &MBRNAM  *CHAR 10 /* Member +
+                          Name                     */
+             DCL        &REPLACE *CHAR 4 /* Replace Existing +
+                          Member         */
+
+             DCL        &FILE    *CHAR 10 /* File Name to Retrieve */
+             DCL        &FILEL   *CHAR 10 /* File Library          */
+             DCL        &SRCF    *CHAR 10 /* Source File Name      */
+             DCL        &SRCFL   *CHAR 10 /* Source Library        */
+             DCL        &TEXT    *CHAR 50 /* Object Text           */
+             DCL        &ATR     *CHAR 10 /* Object Attr           */
+
+             DCL        &NBRRCD *DEC LEN(10 0) /* Number of Current +
+                          Records */
+
+/* Global Message Monitor */
+             MONMSG     MSGID(CPF0000 MCH0000) EXEC(GOTO CMDLBL(ERROR))
+
+/* Display Status Message */
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('Retrieving +
+                          Source Member....') TOPGMQ(*EXT) MSGTYPE(*STATUS)
+
+
+/* Split Qualified Object name into Object and Library Names */
+             CHGVAR     VAR(&FILE)  VALUE(%SST(&QONAME 1 10))
+             CHGVAR     VAR(&FILEL) VALUE(%SST(&QONAME 11 10))
+
+/* Split Qualified Source name into Object and Library Names */
+             CHGVAR     VAR(&SRCF)  VALUE(%SST(&QSNAME 1 10))
+             CHGVAR     VAR(&SRCFL) VALUE(%SST(&QSNAME 11 10))
+
+/* Default Mbr Name to File Name, if Necessary */
+             IF         COND(&MBRNAM='*FILE') THEN(CHGVAR &MBRNAM &FILE)
+
+/* Check if source file exists               */
+             CHKOBJ     &SRCFL/&SRCF *FILE
+             MONMSG     CPF0000 EXEC(DO)
+                SNDPGMMSG  MSG('Source File '||&SRCF|>'not found.') +
+                             MSGTYPE(*COMP)
+                GOTO       END
+             ENDDO
+
+
+/* Retrieve Object Text for Heading Purposes */
+             RTVOBJD    OBJ(&FILEL/&FILE) OBJTYPE(*FILE) OBJATR(&ATR) +
+                          TEXT(&TEXT)
+             MONMSG     CPF0000 EXEC(DO)
+                SNDPGMMSG  MSG('File ' || &FILE |> 'not found.') +
+                             MSGTYPE(*COMP)
+                GOTO       END
+             ENDDO
+
+/* Remove QTEMP Work Files */
+             DLTF       QTEMP/QADSPFFD
+             MONMSG     CPF0000
+
+             DLTF       QTEMP/QAFDACCP
+             MONMSG     CPF0000
+
+             DLTF       QTEMP/QAFDSELO
+             MONMSG     CPF0000
+
+             DLTF       QTEMP/QAFDJOIN
+             MONMSG     CPF0000
+
+             DLTF       QTEMP/QAFDRFMT
+             MONMSG     CPF0000
+
+/* Assume Member Doesn't Exist in Specified File  */
+             ADDPFM     FILE(&SRCFL/&SRCF) MBR(&MBRNAM) SRCTYPE(&ATR) +
+                          TEXT(&TEXT)
+             MONMSG     CPF0000
+
+/* Retrieve number of records in member           */
+             RTVMBRD    FILE(&SRCFL/&SRCF) MBR(&MBRNAM) NBRCURRCD(&NBRRCD)
+             IF         COND(&NBRRCD *NE 0) THEN(DO)
+                IF         COND(&REPLACE='*NO') THEN(DO)
+                   SNDPGMMSG  MSG('Specified Member is not empty.  Clear +
+                                the specified member before continuing.')
+                   GOTO       END
+                ENDDO
+    /* Replace Existing Source Member */
+                ELSE       (DO)
+                   CLRPFM     &SRCFL/&SRCF MBR(&MBRNAM)
+                   CHGPFM     &SRCFL/&SRCF MBR(&MBRNAM) SRCTYPE(&ATR) +
+                                TEXT(&TEXT)
+                ENDDO
+             ENDDO
+
+
+/* Output File Field Description */
+             DSPFFD     FILE(&FILEL/&FILE) OUTPUT(*OUTFILE) +
+                          OUTFILE(QTEMP/QADSPFFD)
+
+             IF         (&ATR='PF' *OR &ATR='LF') THEN(DO)
+    /* Output Access Path Info      */
+             DSPFD      FILE(&FILEL/&FILE) TYPE(*ACCPTH) OUTPUT(*OUTFILE) +
+                          OUTFILE(QTEMP/QAFDACCP)
+    /* Output Select/Omit,JOIN and Record Format Info  */
+             IF         (&ATR='LF') THEN(DO)
+                DSPFD      FILE(&FILEL/&FILE) TYPE(*JOIN)   +
+                             OUTPUT(*OUTFILE) OUTFILE(QTEMP/QAFDJOIN)
+                DSPFD      FILE(&FILEL/&FILE) TYPE(*SELECT) +
+                             OUTPUT(*OUTFILE) OUTFILE(QTEMP/QAFDSELO)
+                DSPFD      FILE(&FILEL/&FILE) TYPE(*RCDFMT) +
+                             OUTPUT(*OUTFILE) OUTFILE(QTEMP/QAFDRFMT)
+             ENDDO
+             ENDDO
+
+
+/* Override system file names to work files in QTEMP */
+             OVRDBF     QADSPFFD QTEMP/QADSPFFD
+             OVRDBF     QAFDACCP QTEMP/QAFDACCP
+             OVRDBF     QAFDSELO QTEMP/QAFDSELO
+             OVRDBF     QAFDJOIN QTEMP/QAFDJOIN
+             OVRDBF     QAFDRFMT QTEMP/QAFDRFMT
+
+/* Point RPG program to desired source member */
+             OVRDBF     FILE(QDDSSRC) TOFILE(&SRCFL/&SRCF) MBR(&MBRNAM)
+
+/* Retrieve DDS Spec RPG Program */
+             CALL       RTVDDSSRCR PARM(&TEXT &MBRNAM &ATR)
+             MONMSG     CPF4131 EXEC(DO) /* Monitor for level check */
+                SNDPGMMSG  MSG('A level check error occured.  This is most +
+                             likely due to an O/S upgrade.  Please +
+                             recompile the program.') MSGTYPE(*COMP)
+                GOTO       END
+             ENDDO
+
+             SNDPGMMSG  MSG('Source Member has been retrieved.') +
+                          MSGTYPE(*COMP)
+
+             GOTO       END
+
+ ERROR:
+             SNDPGMMSG  MSG('The Program Encountered Errors.  Check Job +
+                          Log for Details.') MSGTYPE(*COMP)
+             DMPCLPGM
+
+ END:
+             DLTOVR     *ALL
+             RCLRSC
+             ENDPGM
