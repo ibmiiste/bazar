@@ -113,8 +113,8 @@
                           OUTFILE(QTEMP/QAFDACCP)
     /* Output Select/Omit,JOIN and Record Format Info  */
              IF         (&ATR='LF') THEN(DO)
-                DSPFD      FILE(&FILEL/&FILE) TYPE(*JOIN)   +
-                             OUTPUT(*OUTFILE) OUTFILE(QTEMP/QAFDJOIN)
+                DSPFD      FILE(&FILEL/&FILE) TYPE(*JOIN) OUTPUT(*OUTFILE) +
+                             OUTFILE(QTEMP/QAFDJOIN)
                 DSPFD      FILE(&FILEL/&FILE) TYPE(*SELECT) +
                              OUTPUT(*OUTFILE) OUTFILE(QTEMP/QAFDSELO)
                 DSPFD      FILE(&FILEL/&FILE) TYPE(*RCDFMT) +
