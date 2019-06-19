@@ -44,10 +44,10 @@ Dcl-proc Suppression_ifs export;
 
   dcl-pi Suppression_ifs ind;
     p_chemin varchar(2000) const;
+    p_Jours Int(5) const;
     P_Recursivite ind const options(*nopass:*omit);
     p_Filtre varchar(128) const options(*nopass:*omit);
     p_Type_date char(1) const options(*nopass:*omit);
-    p_Jours Int(5) const options(*nopass:*omit);
   end-pi;
 
 
@@ -55,7 +55,7 @@ Dcl-proc Suppression_ifs export;
   dcl-s l_Retour ind;
   dcl-s l_Recursivite ind inz(*off);
   dcl-s l_Filtre char(128);
-  dcl-s l_type_date char(1);
+  dcl-s l_type_date char(1) Inz('m');
   dcl-s l_commande_qsh char(512);
   Dcl-s l_Jours Int(5);
 
@@ -78,22 +78,21 @@ Dcl-proc Suppression_ifs export;
     // Initialisation des variables avec les paramètres si applicable
     //----------------------------------------------------------
 
-    if %parms > 1;
+    if %parms > 2;
       if %addr(p_Recursivite) <> *NULL;
         l_Recursivite = p_Recursivite;
       endif;
     endif;
 
-    if %parms > 2;
+    if %parms > 3;
       if %addr(p_Filtre) <> *NULL;
         l_Filtre = %trim(p_Filtre);
       endif;
     endif;
 
-    if %parms > 3;
+    if %parms > 4;
       if %addr(p_Type_date) <> *NULL;
         l_type_date = p_Type_date;
-        l_Jours=p_Jours;
       endif;
     endif;
 
@@ -130,23 +129,22 @@ Dcl-proc Suppression_ifs export;
     // M : Date de modification
     // C : Date de création
     // A : Date de dernier accès
-    if l_type_date<>*Blank;
-      l_type_date = %xlate('MCA':'mca':l_type_date);
-      l_commande_qsh = %trim(l_commande_qsh) + ' -'
-                       + l_type_date + 'time';
+    l_type_date = %xlate('MCA':'mca':l_type_date);
+    l_commande_qsh = %trim(l_commande_qsh) + ' -'
+                     + l_type_date + 'time';
 
-      //-------------------------------------------------------------
-      // +/- Nombre de jours
+    //-------------------------------------------------------------
+    // +/- Nombre de jours
 
-      if (l_Jours >= 0);
-        l_commande_qsh = %trim(l_commande_qsh) + ' +';
-      else;
-        l_commande_qsh = %trim(l_commande_qsh) + ' -';
-      endif;
+    if (l_Jours >= 0);
+      l_commande_qsh = %trim(l_commande_qsh) + ' +';
+    else;
+      l_commande_qsh = %trim(l_commande_qsh) + ' -';
+    endif;
 
-      l_commande_qsh = %trim(l_commande_qsh)
-                             + %trim(%editc(%abs(p_Jours):'J'));
-    Endif;
+    l_commande_qsh = %trim(l_commande_qsh)
+                           + %trim(%editc(%abs(p_Jours):'J'));
+
     //-------------------------------------------------------------
     // -exec rm = Remove en QSH
 
